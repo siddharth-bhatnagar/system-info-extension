@@ -86,12 +86,12 @@ function updateMemoryUsage() {
         sysInfo.memory.usage = memoryUsage;
     });
 }
-let key = 'info'
+
 function updateAll() {
     updateCpuUsage();
     updateMemoryUsage();
-    chrome.storage.sync.set({key: sysInfo}, () => {
-        console.log(sysInfo);
+    chrome.storage.sync.set({'key': sysInfo}, () => {
+        console.log("Saved value is", sysInfo);
     })
     timeoutId = setTimeout(updateAll, 3000);
 }

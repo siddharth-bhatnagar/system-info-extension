@@ -1,101 +1,90 @@
 const systemInfo = chrome.system;
-let timeoutId;
-let sysInfo = {};
 
-// installing the sw
-chrome.runtime.onInstalled.addListener(() => {
-    initInfo();
-    initCPU();
-    initMemory();
-    updateAll();
+chrome.runtime.onMessageExternal.addListener(async function (request, sender, sendResponse) {
+    console.log(request, sender);
+    const data = await fetchData();
+    console.log(data);
+    sendResponse(data);
 });
 
-chrome.runtime.onSuspend.addListener(function () {
-    clearTimeout(timeoutId);
-});
+const fetchData = () => {
+    return new Promise(async (resolve, reject) => {
+        const info = await initInfo();
+        const cpu = await initCpu();
+        const memory = await initMemory(); 
+        let payload = {
+            "info": info,
+            "cpuInfo": cpu,
+            "memory": memory
+        }
+        resolve(payload);
+    });
+};
 
+const initInfo = () => {
+    return new Promise((res) => {
+        let operatingSystem;
+        let chromeVersion = navigator.userAgent.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
+        let platform = navigator.platform.replace(/_/g, '-');
 
-chrome.runtime.onSuspendCanceled.addListener(function () {
-    updateAll();
-});
-
-function initInfo() {
-    let operatingSystem;
-
-    if (/CrOS/.test(navigator.userAgent)) {
-        operatingSystem = 'Chrome OS';
-    } else if (/Mac/.test(navigator.platform)) {
-        operatingSystem = 'Mac OS';
-    } else if (/Win/.test(navigator.platform)) {
-        operatingSystem = 'Windows';
-    } else if (/Android/.test(navigator.userAgent)) {
-        operatingSystem = 'Android';
-    } else if (/Linux/.test(navigator.userAgent)) {
-        operatingSystem = 'Linux';
-    } else {
-        operatingSystem = '-';
-    }
-
-    let chromeVersion = navigator.userAgent.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
-    let platform = navigator.platform.replace(/_/g, '-');
-    let data = { "operatingSystem": operatingSystem, "chromeVersion": chromeVersion, "platform": platform };
-
-    sysInfo["info"] = data;
-}
-
-function initCPU() {
-    systemInfo.cpu.getInfo((cpuInfo) => {
-        let cpuName = cpuInfo.modelName.replace(/\(R\)/g, '®').replace(/\(TM\)/, '™');
-        let cpuArch = cpuInfo.archName.replace(/_/g, '-');
-        let cpuFeatures = cpuInfo.features.join(', ').toUpperCase().replace(/_/g, '.') || '-';
-        let processors = cpuInfo.processors;
-
-        cpuUsage = [];
-        for (let processor of processors) {
-            cpuUsage.push(processor.usage);
+        if (/CrOS/.test(navigator.userAgent)) {
+            operatingSystem = 'Chrome OS';
+        } else if (/Mac/.test(navigator.platform)) {
+            operatingSystem = 'Mac OS';
+        } else if (/Win/.test(navigator.platform)) {
+            operatingSystem = 'Windows';
+        } else if (/Android/.test(navigator.userAgent)) {
+            operatingSystem = 'Android';
+        } else if (/Linux/.test(navigator.userAgent)) {
+            operatingSystem = 'Linux';
+        } else {
+            operatingSystem = '-';
         }
 
-        let data = { "name": cpuName, "arch": cpuArch, "features": cpuFeatures, "usage": cpuUsage };
-        sysInfo["cpuInfo"] = data;
+        let data = { "operatingSystem": operatingSystem, "chromeVersion": chromeVersion, "platform": platform };
+        res(data);
     });
 }
 
-function updateCpuUsage() {
-    systemInfo.cpu.getInfo((cpuInfo) => {
-        const processors = cpuInfo.processors;
-        let cpuUsage = [];
-        for (let processor of processors) {
-            cpuUsage.push(processor.usage);
-        }
-        sysInfo.cpuInfo.usage = cpuUsage;
+const initCpu = () => {
+    return new Promise((res) => {
+        systemInfo.cpu.getInfo(async (cpuInfo) => {
+            let cpuName = await cpuInfo.modelName.replace(/\(R\)/g, '®').replace(/\(TM\)/, '™');
+            let cpuArch = await cpuInfo.archName.replace(/_/g, '-');
+            let cpuFeatures = await cpuInfo.features.join(', ').toUpperCase().replace(/_/g, '.') || '-';
+            let processors = await cpuInfo.processors;
+
+            cpuUsage = [];
+            for (let processor of processors) {
+                await cpuUsage.push(processor.usage);
+            }
+
+            let data = { "name": cpuName, "arch": cpuArch, "features": cpuFeatures, "usage": cpuUsage };
+
+            res(data);
+        });
     });
 }
 
-function initMemory() {
-    systemInfo.memory.getInfo((memoryInfo) => {
-        let capacity = bytesToMegaBytes(memoryInfo.capacity);
-        let memoryUsage = bytesToMegaBytes(memoryInfo.availableCapacity);
-        let data = { "capacity": capacity, "usage": memoryUsage };
-        sysInfo["memory"] = data;
+const initMemory = () => {
+    return new Promise((res) => {
+        systemInfo.memory.getInfo((memoryInfo) => {
+            let capacity = bytesToMegaBytes(memoryInfo.capacity);
+            let memoryUsage = bytesToMegaBytes(memoryInfo.availableCapacity);
+            let data = { "capacity": capacity, "usage": memoryUsage };
+            
+            res(data);
+        });
     });
-}
-
-function updateMemoryUsage() {
-    systemInfo.memory.getInfo((memoryInfo) => {
-        let memoryUsage = bytesToMegaBytes(memoryInfo.availableCapacity);
-        sysInfo.memory.usage = memoryUsage;
-    });
-}
-
-function updateAll() {
-    updateCpuUsage();
-    updateMemoryUsage();
-    chrome.storage.sync.set({'key': sysInfo}, () => {
-        console.log("Saved value is", sysInfo);
-    })
-    timeoutId = setTimeout(updateAll, 3000);
 }
 
 function bytesToMegaBytes(number) {
     return Math.round(number / 1024 / 1024);
 }
+
+
+
+
+
+
+
